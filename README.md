@@ -43,19 +43,6 @@ Instead of manually reviewing hundreds of resumes, recruiters can upload resumes
 - Vercel
 - Render
 
-## 📂 Project Structure
-
-```text
-recruitiq/
-│
-├── frontend/
-├── backend/
-├── docs/
-├── assets/
-├── architecture/
-├── README.md
-└── .env.example
-```
 
 ## 🎯 Project Goal
 
