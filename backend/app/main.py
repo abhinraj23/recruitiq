@@ -1,9 +1,19 @@
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
+
 from app.api.routes import router
+from app.core.config import settings
+from app.db.database import create_db_and_tables
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    create_db_and_tables()
+    yield
 
 app=FastAPI(
-    title="RecruitIQ API",
-    version="1.0.0"
+    title=settings.APP_NAME, 
+    version=settings.APP_VERSION,
+    lifespan=lifespan
 ) 
 
 app.include_router(router)
