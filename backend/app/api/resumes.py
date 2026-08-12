@@ -1,5 +1,7 @@
 from fastapi import APIRouter,UploadFile,File,Depends
 from sqlmodel import Session
+import json
+
 from app.services.resume_parser import extract_text_from_pdf
 from app.services.candidate_extractor import extract_candidate_profile
 from app.db.session import get_session
@@ -26,10 +28,10 @@ async def upload_resume(file:UploadFile=File(...),session:Session=Depends(get_se
         name=candidate_profile.name,
         email=candidate_profile.email,
         phone=candidate_profile.phone,
-        skills=",".join(candidate_profile.skills),
-        projects=",".join(candidate_profile.projects),
-        education=",".join(candidate_profile.education),
-        experience_years=candidate_profile.experience_years
+        skills=json.dumps(candidate_profile.skills),
+        projects=json.dumps([project.model_dump() for project in candidate_profile.projects]),
+        education=json.dumps([education.model_dump() for education in candidate_profile.education]),
+        experience=json.dumps([experience.model_dump() for experience in candidate_profile.experience])
     )
 
     session.add(candidate)

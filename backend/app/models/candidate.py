@@ -10,5 +10,5 @@ class Candidate(SQLModel,table=True):
     skills:str|None=None
     projects:str|None=None
     education:str|None=None
-    experience_years:float|None=None
+    experience:str|None=None
     created_at:datetime =Field(default_factory=lambda:datetime.now(timezone.utc))
