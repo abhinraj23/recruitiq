@@ -23,3 +23,4 @@ app.include_router(router)
 app.include_router(auth_router)
 app.include_router(resumes_router)
 app.include_router(job_router)
+

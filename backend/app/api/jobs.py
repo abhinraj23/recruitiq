@@ -1,6 +1,8 @@
-from fastapi import APIRouter,Depends
-from sqlmodel import Session
+from fastapi import APIRouter,Depends,HTTPException
+from sqlmodel import Session,select
 
+from app.models.candidate import Candidate
+from app.services.matcher import candidate_to_job
 from app.schemas.job import JDRequest
 from app.services.job_extractor import extract_job_profile
 from app.db.session import get_session
@@ -30,3 +32,23 @@ async def extract_job(request:JDRequest,session:Session=Depends(get_session)):
     session.refresh(job)
 
     return job
+
+@router.get("/{job_id}/match/{candidate_id}")
+def match_job_candidate(job_id:int,candidate_id:int,session:Session=Depends(get_session)):
+    
+    job=session.get(Job,job_id)
+    candidate=session.get(Candidate,candidate_id)
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="job not found"
+        )
+    
+    if not candidate:
+        raise HTTPException(
+            status_code=404,
+            detail="Candidate not found"
+            )
+    
+    return candidate_to_job(candidate,job)
