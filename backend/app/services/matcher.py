@@ -21,58 +21,79 @@ def project_match(candidate_projects:list[dict],required_tech:list[str])->float:
     if not required_tech:
         return 1.0
     
-    candidate_tech=set()
+    required={normalize(skill) for skill in required_tech}
+    matched=set()
 
     for project in candidate_projects:
-        for tech in project.get("technologies",[]):
-            candidate_tech.add(normalize(tech))
+        technologies={normalize(tech) for tech in project.get("technologies",[])}
 
-    required={normalize(skill) for skill in required_tech}
+        matched.update(technologies.intersection(required))
 
-    matched=candidate_tech.intersection(required)
+        description=normalize(project.get("description",[]))
 
+        for tech in required:
+            if tech in description:
+                matched.add(tech)
+        
     return len(matched)/len(required)
 
 
-def experience_match(candidate_experience:list[dict],job_role:str,required_years:float|None,job_responsibilities:list[str])->float:
+
+def experience_match(candidate_experience:list[dict],required_years:float|None,job_required_skills:list[str],job_preferred_skills:list[str])->float:
     if not candidate_experience:
         return 0.0
     
-    target_role=normalize(job_role)
-    total_duties=len(job_responsibilities)
+    if not job_required_skills and not job_preferred_skills:
+        return 0.0
+    
 
     relevant_years=0.0
-    responsibility_matches=0
+    experience_relevance_score=[]
+
+    threshold=0.30
 
     for experience in candidate_experience:
-        role=normalize(experience.get("role",""))
 
-        if role in target_role or target_role in role:
-            relevant_years+=experience.get("years",0) or 0
+        candidate_responsibilities=",".join(normalize(responsibility) for responsibility in experience.get("responsibilities",[]))
 
-            candidate_responsibilities=[normalize(responsibility) for responsibility in experience.get("responsibilities",[])]
+        if not candidate_responsibilities:
+            continue
+        
+        matched_required ={
+            normalize(skill) for skill in job_required_skills if normalize(skill) in candidate_responsibilities 
+        }
 
-            for duty in job_responsibilities:
-                duty=normalize(duty)
+        matched_preferred={
+            normalize(skill) for skill in job_preferred_skills if normalize(skill) in candidate_responsibilities
+        }
 
-                if any(duty in candidate_duty or candidate_duty in duty for candidate_duty in candidate_responsibilities):
-                    responsibility_matches+=1 
-                
+        required_score=(len(matched_required)/len(job_required_skills) if matched_required else 0.0)
+
+        preferred_score=(len(matched_preferred)/len(job_preferred_skills) if matched_preferred else 0.0)
+
+        relavance_score=(required_score*0.7+preferred_score*0.3)
+
+        experience_relevance_score.append(relavance_score)
+
+        if relavance_score>=threshold:
+            relevant_years+=(experience.get("years",0) or 0)
     
+    if not experience_relevance_score:
+        return 0.0
+    
+
+    relavance_score=max(experience_relevance_score)
+
     if required_years:
+
         duration_score=min(relevant_years/required_years,1.0)
+
     else:
         duration_score=1.0
-
-    
-    if total_duties:
-        duties_score=responsibility_matches/total_duties
-    else:
-        duties_score=1.0
     
 
     return (
-        duties_score*0.3+duration_score*0.7
+        relavance_score*0.3+duration_score*0.7
     )
 
 
@@ -94,13 +115,174 @@ def qualification_match(
     candidate_education: list[dict],
     job_qualifications: list[str],
 ) -> float:
+
     if not job_qualifications:
         return 1.0
 
     if not candidate_education:
         return 0.0
 
-    return 1.0
+    job_text = normalize(
+        " ".join(str(item) for item in job_qualifications)
+    )
+
+    # Detect the required degree level from the JD
+    if any(
+        term in job_text
+        for term in ["master","masters", "m.tech", "mtech", "m.e", "m.sc", "msc"]
+    ):
+        required_level = "master"
+
+    elif any(
+        term in job_text
+        for term in [
+            "bachelor",
+            "b.tech",
+            "btech",
+            "b.e",
+            "b.e.",
+            "b.sc",
+            "bsc",
+        ]
+    ):
+        required_level = "bachelor"
+    
+    elif any(
+    term in job_text
+    for term in ["phd", "ph.d", "doctorate", "doctoral"]):
+        required_level = "phd"
+
+    else:
+        required_level = None
+
+    # Broad field groups used only to interpret the JD
+    field_groups = {
+        "computer": [
+            "computer science",
+            "computer engineering",
+            "software engineering",
+            "information technology",
+            "information systems",
+        ],
+        "electronics": [
+            "electronics",
+            "electronics and communication",
+            "ece",
+            "eee",
+            "electrical",
+            "electrical and electronics"
+        ],
+        "data": [
+            "data science",
+            "data analytics",
+            "statistics",
+        ],
+        "ai": [
+            "artificial intelligence",
+            "machine learning",
+        ],
+    }
+
+    requested_groups = set()
+
+    for group, terms in field_groups.items():
+        if any(term in job_text for term in terms):
+            requested_groups.add(group)
+
+    best_score = 0.0
+
+    for education in candidate_education:
+
+        degree = normalize(
+            str(education.get("degree", ""))
+        )
+
+        field = normalize(
+            str(education.get("field", ""))
+        )
+
+        candidate_text = f"{degree} {field}"
+
+        # Check degree level
+        if required_level == "bachelor":
+            degree_match = any(
+                term in degree
+                for term in [
+                    "bachelor",
+                    "b.tech",
+                    "btech",
+                    "b.e",
+                    "b.sc",
+                    "bsc",
+                ]
+            )
+
+        elif required_level == "master":
+            degree_match = any(
+                term in degree
+                for term in [
+                    "master",
+                    "m.tech",
+                    "mtech",
+                    "m.e",
+                    "m.sc",
+                    "msc",
+                ]
+            )
+        
+        elif required_level=="phd":
+            degree_match=any(
+                term in degree
+                for term in [
+                    "phd",
+                    "ph.d",
+                    "doctorate",
+                    "doctoral"
+                ]
+            )
+        
+
+        else:
+            degree_match = True
+
+        if not degree_match:
+            continue
+
+        # If the JD doesn't specify a field,
+        # matching the degree level is sufficient.
+        if not requested_groups:
+            best_score = max(best_score, 1.0)
+            continue
+
+        candidate_groups = set()
+
+        for group, terms in field_groups.items():
+            if any(term in candidate_text for term in terms):
+                candidate_groups.add(group)
+
+        # Correct degree + relevant field
+        if requested_groups.intersection(candidate_groups):
+            best_score = max(best_score, 1.0)
+
+        # Correct degree but technical/related field
+        elif any(
+            term in candidate_text
+            for term in [
+                "engineering",
+                "technology",
+                "computer",
+                "science",
+                "information",
+                "data",
+            ]
+        ):
+            best_score = max(best_score, 0.5)
+
+        # Correct degree but unrelated field
+        else:
+            best_score = max(best_score, 0.0)
+
+    return best_score
 
 
 
@@ -152,7 +334,7 @@ def candidate_to_job(candidate,job):
 
     preferred_skill_score=preferred_skill_match(candidate_skills,job_preferred_skills)
 
-    experience_score=experience_match(candidate_experiece,job.title,job.experience_years,job_responsibilities)
+    experience_score=experience_match(candidate_experiece,job.experience_years,job_required_skills,job_preferred_skills)
 
     qualification_score=qualification_match(candidate_education,job_qualifications)
 
