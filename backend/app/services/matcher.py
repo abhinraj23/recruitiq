@@ -1,4 +1,9 @@
 import json
+from sentence_transformers import SentenceTransformer
+from sklearn.metrics.pairwise import cosine_similarity
+
+
+semantic_model=SentenceTransformer("BAAI/bge-small-en-v1.5")
 
 
 def normalize(sample:str)->str:
@@ -24,6 +29,9 @@ def project_match(candidate_projects:list[dict],required_tech:list[str])->float:
     required={normalize(skill) for skill in required_tech}
     matched=set()
 
+    project_descriptions = []
+
+
     for project in candidate_projects:
         technologies={normalize(tech) for tech in project.get("technologies",[])}
 
@@ -31,15 +39,59 @@ def project_match(candidate_projects:list[dict],required_tech:list[str])->float:
 
         description=normalize(project.get("description",[]))
 
+        if description:
+            project_descriptions.append(description)
+
         for tech in required:
             if tech in description:
                 matched.add(tech)
         
-    return len(matched)/len(required)
+    lexical_score=len(matched)/len(required)
+
+    if not project_descriptions:
+        return lexical_score
+    
+    
+    required_list=list(required)
+    required_embedding=semantic_model.encode(required_list)
+
+    projects_embedding=semantic_model.encode(project_descriptions)
+
+    similarity_matrix = cosine_similarity(
+        required_embedding,
+        projects_embedding
+    )
+
+    semantic_scores=[]
+
+    semantic_threshold=0.65
+
+    for index,tech in enumerate(required_list):
+        if tech in matched:
+            semantic_scores.append(1.0)
+            continue
+        
+        best_similarity = float(
+            similarity_matrix[index].max()
+        )
+
+        if best_similarity >= semantic_threshold:
+            semantic_scores.append(best_similarity)
+        else:
+            semantic_scores.append(0.0)
+    
+    semantic_score = (
+        sum(semantic_scores) / len(semantic_scores)
+    )
 
 
 
-def experience_match(candidate_experience:list[dict],required_years:float|None,job_required_skills:list[str],job_preferred_skills:list[str])->float:
+    return (lexical_score*0.7+semantic_score*0.3)
+
+
+
+
+def experience_match(candidate_experience:list[dict],required_years:float|None,job_required_skills:list[str],job_preferred_skills:list[str],job_responsibilities:list[str])->float:
     if not candidate_experience:
         return 0.0
     
@@ -52,37 +104,54 @@ def experience_match(candidate_experience:list[dict],required_years:float|None,j
 
     threshold=0.30
 
+    jd_embedding=semantic_model.encode(job_responsibilities)
+
     for experience in candidate_experience:
 
-        candidate_responsibilities=",".join(normalize(responsibility) for responsibility in experience.get("responsibilities",[]))
+        candidate_responsibilities=[normalize(responsibility) for responsibility in experience.get("responsibilities",[])]
 
         if not candidate_responsibilities:
             continue
         
+        candidate_text=" ".join(candidate_responsibilities)
+        
         matched_required ={
-            normalize(skill) for skill in job_required_skills if normalize(skill) in candidate_responsibilities 
+            normalize(skill) for skill in job_required_skills if normalize(skill) in candidate_text 
         }
 
         matched_preferred={
-            normalize(skill) for skill in job_preferred_skills if normalize(skill) in candidate_responsibilities
+            normalize(skill) for skill in job_preferred_skills if normalize(skill) in candidate_text
         }
 
         required_score=(len(matched_required)/len(job_required_skills) if matched_required else 0.0)
 
         preferred_score=(len(matched_preferred)/len(job_preferred_skills) if matched_preferred else 0.0)
 
-        relavance_score=(required_score*0.7+preferred_score*0.3)
+        lexical_score=(required_score*0.7+preferred_score*0.3)
 
-        experience_relevance_score.append(relavance_score)
+        #semantic processing
 
-        if relavance_score>=threshold:
+        candidate_embedding=semantic_model.encode(job_responsibilities)
+
+        similarity_matrix=cosine_similarity(
+            candidate_embedding,jd_embedding
+        )
+
+        semantic_score=float(similarity_matrix.max())
+
+        relevance_score=(lexical_score*0.6+semantic_score*0.4)
+
+        experience_relevance_score.append(relevance_score)
+
+
+        if relevance_score>=threshold:
             relevant_years+=(experience.get("years",0) or 0)
     
     if not experience_relevance_score:
         return 0.0
     
 
-    relavance_score=max(experience_relevance_score)
+    relevance_score=max(experience_relevance_score)
 
     if required_years:
 
@@ -93,7 +162,7 @@ def experience_match(candidate_experience:list[dict],required_years:float|None,j
     
 
     return (
-        relavance_score*0.3+duration_score*0.7
+        relevance_score*0.3+duration_score*0.7
     )
 
 
@@ -182,13 +251,17 @@ def qualification_match(
             "machine learning",
         ],
     }
+    
+    requested_fields = []
 
-    requested_groups = set()
-
-    for group, terms in field_groups.items():
-        if any(term in job_text for term in terms):
-            requested_groups.add(group)
-
+    for terms in field_groups.values():
+        for term in terms:
+            if term in job_text:
+                requested_fields.append(term)
+    
+    if not requested_fields:
+        requested_fields=[]
+    
     best_score = 0.0
 
     for education in candidate_education:
@@ -204,67 +277,91 @@ def qualification_match(
         candidate_text = f"{degree} {field}"
 
         # Check degree level
-        if required_level == "bachelor":
-            degree_match = any(
-                term in degree
-                for term in [
-                    "bachelor",
-                    "b.tech",
-                    "btech",
-                    "b.e",
-                    "b.sc",
-                    "bsc",
-                ]
-            )
+        if any(
+            term in degree
+            for term in [
+                "phd",
+                "ph.d",
+                "doctorate",
+                "doctoral",
+            ]
+        ):
+            candidate_level = "phd"
 
-        elif required_level == "master":
-            degree_match = any(
-                term in degree
-                for term in [
-                    "master",
-                    "m.tech",
-                    "mtech",
-                    "m.e",
-                    "m.sc",
-                    "msc",
-                ]
-            )
-        
-        elif required_level=="phd":
-            degree_match=any(
-                term in degree
-                for term in [
-                    "phd",
-                    "ph.d",
-                    "doctorate",
-                    "doctoral"
-                ]
-            )
-        
+        elif any(
+            term in degree
+            for term in [
+                "master",
+                "m.tech",
+                "mtech",
+                "m.e",
+                "m.sc",
+                "msc",
+            ]
+        ):
+            candidate_level = "master"
+
+        elif any(
+            term in degree
+            for term in [
+                "bachelor",
+                "b.tech",
+                "btech",
+                "b.e",
+                "b.sc",
+                "bsc",
+            ]
+        ):
+            candidate_level = "bachelor"
 
         else:
-            degree_match = True
+            candidate_level = None
 
-        if not degree_match:
-            continue
+        degree_rank = {
+            "bachelor": 1,
+            "master": 2,
+            "phd": 3,
+        }
 
-        # If the JD doesn't specify a field,
-        # matching the degree level is sufficient.
-        if not requested_groups:
+        
+        if required_level:
+
+            if candidate_level not in degree_rank:
+                continue
+
+            if (
+                degree_rank[candidate_level]
+                < degree_rank[required_level]
+            ):
+                continue
+
+        if not requested_fields:
             best_score = max(best_score, 1.0)
             continue
-
+        
         candidate_groups = set()
 
         for group, terms in field_groups.items():
-            if any(term in candidate_text for term in terms):
+            if any(
+                term in candidate_text
+                for term in terms
+            ):
                 candidate_groups.add(group)
 
-        # Correct degree + relevant field
-        if requested_groups.intersection(candidate_groups):
-            best_score = max(best_score, 1.0)
+        requested_groups = set()
 
-        # Correct degree but technical/related field
+        for group, terms in field_groups.items():
+            if any(
+                term in job_text
+                for term in terms
+            ):
+                requested_groups.add(group)
+
+        if requested_groups.intersection(
+            candidate_groups
+        ):
+            lexical_score = 1.0
+
         elif any(
             term in candidate_text
             for term in [
@@ -276,16 +373,53 @@ def qualification_match(
                 "data",
             ]
         ):
-            best_score = max(best_score, 0.5)
+            lexical_score = 0.5
 
-        # Correct degree but unrelated field
         else:
-            best_score = max(best_score, 0.0)
+            lexical_score = 0.0
+
+        #semantic processing
+        
+        candidate_field = field
+
+        if candidate_field and requested_fields:
+
+            requested_embeddings = semantic_model.encode(
+                requested_fields
+            )
+
+            candidate_embedding = semantic_model.encode(
+                [candidate_field]
+            )
+
+            similarity_matrix = cosine_similarity(
+                requested_embeddings,
+                candidate_embedding
+            )
+
+            semantic_score = float(
+                similarity_matrix.max()
+            )
+
+        else:
+            semantic_score = 0.0
+        
+        field_score = (
+            lexical_score * 0.7
+            + semantic_score * 0.3
+        )
+
+        best_score = max(
+            best_score,
+            field_score
+        )
 
     return best_score
 
+    
 
-
+        
+            
 def calculate_match_score(project_score:float,experience_score:float,required_skills_score:float,preferred_skills_score:float,qualification_score:float)->float:
     score=(
         project_score*0.30
@@ -334,7 +468,7 @@ def candidate_to_job(candidate,job):
 
     preferred_skill_score=preferred_skill_match(candidate_skills,job_preferred_skills)
 
-    experience_score=experience_match(candidate_experiece,job.experience_years,job_required_skills,job_preferred_skills)
+    experience_score=experience_match(candidate_experiece,job.experience_years,job_required_skills,job_preferred_skills,job_responsibilities)
 
     qualification_score=qualification_match(candidate_education,job_qualifications)
 
