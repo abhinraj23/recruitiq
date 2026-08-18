@@ -38,6 +38,11 @@ def retrieve_and_rank_candidates(job, top_k: int = 5):
             ranked_candidates.append({
                 "candidate_id": int(candidate_id),
                 "semantic_distance":distance,
+                "name": candidate.name,
+                "skills": candidate.skills,
+                "experience": candidate.experience,
+                "projects": candidate.projects,
+                "education": candidate.education,
                 **score
             })
 

@@ -6,6 +6,7 @@ from app.services.matcher import candidate_to_job
 from app.schemas.job import JDRequest
 from app.services.job_extractor import extract_job_profile
 from app.services.candidate_retrieval import retrieve_and_rank_candidates
+from app.services.rag_service import generate_candidate_analysis
 from app.db.session import get_session
 from app.models.job import Job
 
@@ -66,3 +67,22 @@ def search_job_candidates(job_id:int,top_k:int=5,session:Session=Depends(get_ses
         )
     
     return retrieve_and_rank_candidates(job,top_k=top_k)
+
+@router.get("/{job_id}/analysis")
+def analyse_job(job_id:int,top_k:int=5,session:Session=Depends(get_session)):
+
+    job=session.get(Job,job_id)
+
+    if not job:
+        raise HTTPException(
+            status_code=404,
+            detail="job not found"
+        )
+    return {
+        "job_id":job_id,
+        "analysis":generate_candidate_analysis(
+            job,
+            top_k=top_k
+        )
+    }
+
