@@ -17,17 +17,18 @@ sqlite_engine = create_engine(SQLITE_URL)
 # -----------------------------
 # DESTINATION: Railway PostgreSQL
 # -----------------------------
-POSTGRES_URL = os.getenv("POSTGRES_URL")
+POSTGRES_URL = os.getenv("DATABASE_URL")
 
 if POSTGRES_URL.startswith("postgres://"):
     POSTGRES_URL = POSTGRES_URL.replace(
         "postgres://", "postgresql+psycopg://", 1
     )
 elif POSTGRES_URL.startswith("postgresql://"):
-    POSTGRES_URL = POSTGRES_URL.replace(
-        "postgresql://", "postgresql+psycopg://", 1
-    )
-
+    if "+psycopg" not in POSTGRES_URL:
+        POSTGRES_URL = POSTGRES_URL.replace(
+            "postgresql://", "postgresql+psycopg://", 1
+        )
+    
 postgres_engine = create_engine(POSTGRES_URL)
 
 
