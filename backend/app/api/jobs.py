@@ -118,3 +118,13 @@ def generate_candidate_interview(
         )
     }
 
+
+@router.get("/debug")
+def debug_jobs(session: Session = Depends(get_session)):
+    jobs = session.exec(select(Job)).all()
+
+    return {
+        "job_count": len(jobs),
+        "job_ids": [job.id for job in jobs],
+        "job_titles": [job.title for job in jobs],
+    }
