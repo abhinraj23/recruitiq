@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     ALGORITHM: str="HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int=30
     GEMINI_API_KEY:str
+    CHROMA_HOST: str = "localhost"
+    CHROMA_PORT: int = 8000
 
     class Config:
         env_file=".env"

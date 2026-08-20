@@ -1,15 +1,28 @@
 import chromadb
 from sentence_transformers import SentenceTransformer
 from sqlmodel import Session,select
+import os
+from dotenv import load_dotenv
 
 from app.models.candidate import Candidate
 from app.models.job import Job
 from app.db.database import engine
 from app.services.matcher import candidate_to_job
 
-client=chromadb.PersistentClient(
-    path="./chroma_db"
-)
+load_dotenv()
+
+CHROMA_HOST = os.getenv("CHROMA_HOST")
+CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
+
+if CHROMA_HOST:
+    client = chromadb.HttpClient(
+        host=CHROMA_HOST,
+        port=CHROMA_PORT
+    )
+else:
+    client = chromadb.PersistentClient(
+        path="./chroma_db"
+    )
 
 candidate_collections=client.get_or_create_collection(
     name="candidates"
@@ -85,7 +98,6 @@ def index_test_candidates():
 
         candidates=session.exec(
             select(Candidate)
-            .where(Candidate.id>=2,Candidate.id<=11)
         ).all()
 
         for candidate in candidates:
