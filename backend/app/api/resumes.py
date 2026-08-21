@@ -1,5 +1,5 @@
 from fastapi import APIRouter,UploadFile,File,Depends
-from sqlmodel import Session
+from sqlmodel import Session,select
 import json
 
 from app.services.resume_parser import extract_text_from_pdf
