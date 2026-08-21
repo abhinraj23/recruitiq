@@ -134,6 +134,4 @@ def search_candidates_for_job(job, top_k: int = 5):
         top_k=top_k
     )
 
-    
-    
 
