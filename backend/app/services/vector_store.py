@@ -5,19 +5,20 @@ import os
 from dotenv import load_dotenv
 
 from app.models.candidate import Candidate
+from app.core.config import settings
 from app.models.job import Job
 from app.db.database import engine
 from app.services.matcher import candidate_to_job
 
-load_dotenv()
 
-CHROMA_HOST = os.getenv("CHROMA_HOST")
-CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
+CHROMA_HOST = settings.CHROMA_HOST
+CHROMA_PORT = settings.CHROMA_PORT
 
 if CHROMA_HOST:
     client = chromadb.HttpClient(
         host=CHROMA_HOST,
-        port=CHROMA_PORT
+        port=CHROMA_PORT,
+        ssl=True
     )
 else:
     client = chromadb.PersistentClient(
@@ -28,9 +29,15 @@ candidate_collections=client.get_or_create_collection(
     name="candidates"
 )
 
-embedding_model = SentenceTransformer(
-        "BAAI/bge-small-en-v1.5"
-        )
+_embedding_model = None
+
+def get_embedding_model():
+    global _embedding_model
+
+    if _embedding_model is None:
+        _embedding_model = SentenceTransformer("BAAI/bge-small-en-v1.5")
+    
+    return _embedding_model
 
 def build_candidate_document(candidate) -> str:
 
@@ -76,7 +83,7 @@ def add_candidate(candidate):
 
     document=build_candidate_document(candidate)
 
-    embedding=embedding_model.encode(
+    embedding=get_embedding_model().encode(
         document
     ).tolist()
 
@@ -108,7 +115,7 @@ def index_test_candidates():
 
 def search_candidates(query: str, top_k: int = 5):
 
-    query_embedding = embedding_model.encode(
+    query_embedding = get_embedding_model().encode(
         query
     ).tolist()
 
