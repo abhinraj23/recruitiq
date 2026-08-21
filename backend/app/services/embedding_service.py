@@ -40,9 +40,13 @@ def index_candidates():
             select(Candidate)
         ).all()
 
+        print("Starting embedding...")
+
         for candidate in candidates:
 
             document = build_candidate_document(candidate)
+
+            print(f"Embedding candidate {candidate.id}...")
 
             embedding = model.encode(
                 document
@@ -59,6 +63,8 @@ def index_candidates():
                     }
                 ]
             )
+
+            print(f"Indexed candidate {candidate.id}")
 
         print(f"Indexed {len(candidates)} candidates")
 
