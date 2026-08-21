@@ -1,7 +1,7 @@
 import chromadb
-from sentence_transformers import SentenceTransformer
 from sqlmodel import Session,select
 import os
+import httpx
 from dotenv import load_dotenv
 
 from app.models.candidate import Candidate
@@ -10,6 +10,7 @@ from app.models.job import Job
 from app.db.database import engine
 from app.services.matcher import candidate_to_job
 
+load_dotenv()
 
 CHROMA_HOST = settings.CHROMA_HOST
 CHROMA_PORT = settings.CHROMA_PORT
@@ -28,15 +29,21 @@ candidate_collections=client.get_or_create_collection(
     name="candidates"
 )
 
-_embedding_model = None
+EMBEDDING_SERVICE_URL = os.getenv(
+    "EMBEDDING_SERVICE_URL"
+)
 
-def get_embedding_model():
-    global _embedding_model
 
-    if _embedding_model is None:
-        _embedding_model = SentenceTransformer("BAAI/bge-small-en-v1.5")
-    
-    return _embedding_model
+def get_embedding(text: str):
+    response = httpx.post(
+        f"{EMBEDDING_SERVICE_URL}/embedding/embed",
+        json={"text": text},
+        timeout=120.0
+    )
+
+    response.raise_for_status()
+
+    return response.json()["embedding"]
 
 def build_candidate_document(candidate) -> str:
 
@@ -82,9 +89,7 @@ def add_candidate(candidate):
 
     document=build_candidate_document(candidate)
 
-    embedding=get_embedding_model().encode(
-        document
-    ).tolist()
+    embedding = get_embedding(document)
 
     candidate_collections.upsert(
         ids=[str(candidate.id)],
@@ -114,9 +119,7 @@ def index_test_candidates():
 
 def search_candidates(query: str, top_k: int = 5):
 
-    query_embedding = get_embedding_model().encode(
-        query
-    ).tolist()
+    query_embedding = get_embedding(query)
 
     results = candidate_collections.query(
         query_embeddings=[query_embedding],
