@@ -18,7 +18,6 @@ if CHROMA_HOST:
     client = chromadb.HttpClient(
         host=CHROMA_HOST,
         port=CHROMA_PORT,
-        ssl=True
     )
 else:
     client = chromadb.PersistentClient(
