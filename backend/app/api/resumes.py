@@ -39,3 +39,21 @@ async def upload_resume(file:UploadFile=File(...),session:Session=Depends(get_se
     session.refresh(candidate)
 
     return candidate
+
+    
+@router.get("/debug")
+def debug_candidates(
+    session: Session = Depends(get_session)
+):
+    candidates = session.exec(select(Candidate)).all()
+
+    return {
+        "count": len(candidates),
+        "candidates": [
+            {
+                "id": candidate.id,
+                "name": candidate.name
+            }
+            for candidate in candidates
+        ]
+    }
