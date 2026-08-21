@@ -6,6 +6,7 @@ from app.services.resume_parser import extract_text_from_pdf
 from app.services.candidate_extractor import extract_candidate_profile
 from app.db.session import get_session
 from app.models.candidate import Candidate
+from app.services.vector_store import index_test_candidates
 
 router=APIRouter(
     prefix="/resumes",
@@ -57,3 +58,8 @@ def debug_candidates(
             for candidate in candidates
         ]
     }
+
+@router.post("/index-candidates")
+def index_candidates_to_chroma():
+    index_test_candidates()
+    return {"message": "Candidates indexed successfully"}
