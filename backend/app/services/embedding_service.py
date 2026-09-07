@@ -24,3 +24,6 @@ def get_model():
 
 def get_embedding(text: str):
     return get_model().encode(text).tolist()
+
+def get_embeddings(texts: list[str]):
+    return get_model().encode(texts).tolist()

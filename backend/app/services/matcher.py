@@ -1,9 +1,29 @@
 import json
-from sentence_transformers import SentenceTransformer
+import os
+import httpx
 from sklearn.metrics.pairwise import cosine_similarity
+from dotenv import load_dotenv
+
+load_dotenv()
+
+EMBEDDING_SERVICE_URL = os.getenv(
+    "EMBEDDING_SERVICE_URL"
+)
 
 
-semantic_model=SentenceTransformer("BAAI/bge-small-en-v1.5")
+def get_embeddings(texts: list[str]) -> list[list[float]]:
+    response = httpx.post(
+        f"{EMBEDDING_SERVICE_URL}/embedding/embed-batch",
+        json={"texts": texts},
+        timeout=120.0
+    )
+
+    response.raise_for_status()
+
+    return response.json()["embeddings"]
+
+
+
 
 
 def normalize(sample:str)->str:
@@ -53,9 +73,14 @@ def project_match(candidate_projects:list[dict],required_tech:list[str])->float:
     
     
     required_list=list(required)
-    required_embedding=semantic_model.encode(required_list)
 
-    projects_embedding=semantic_model.encode(project_descriptions)
+    texts = required_list + project_descriptions
+
+    embeddings = get_embeddings(texts)
+
+    required_embedding=embeddings[:len(required_list)]
+
+    projects_embedding=embeddings[len(required_list):]
 
     similarity_matrix = cosine_similarity(
         required_embedding,
@@ -95,7 +120,7 @@ def experience_match(candidate_experience:list[dict],required_years:float|None,j
     if not candidate_experience:
         return 0.0
     
-    if not job_required_skills and not job_preferred_skills:
+    if (not job_required_skills and not job_preferred_skills and not job_responsibilities):
         return 0.0
     
 
@@ -104,9 +129,41 @@ def experience_match(candidate_experience:list[dict],required_years:float|None,j
 
     threshold=0.30
 
-    jd_embedding=semantic_model.encode(job_responsibilities)
+    all_candidate_responsibilities = []
 
     for experience in candidate_experience:
+        responsibilities = [
+            normalize(responsibility)
+            for responsibility in experience.get("responsibilities", [])
+        ]
+        
+        all_candidate_responsibilities.append(responsibilities)
+    
+    flat_candidate_responsibilities = [
+    responsibility
+    for responsibilities in all_candidate_responsibilities
+    for responsibility in responsibilities
+]
+
+    if job_responsibilities and flat_candidate_responsibilities:
+        texts = (flat_candidate_responsibilities + job_responsibilities)
+
+        embeddings = get_embeddings(texts)
+
+        candidate_embeddings = embeddings[:len(flat_candidate_responsibilities)]
+
+        job_embeddings = embeddings[len(flat_candidate_responsibilities):]
+
+        similarity_matrix = cosine_similarity(
+            candidate_embeddings,
+            job_embeddings
+        )
+
+    else:
+        similarity_matrix = None
+
+
+    for experience_index,experience in enumerate(candidate_experience):
 
         candidate_responsibilities=[normalize(responsibility) for responsibility in experience.get("responsibilities",[])]
 
@@ -131,21 +188,39 @@ def experience_match(candidate_experience:list[dict],required_years:float|None,j
 
         #semantic processing
 
-        candidate_embedding=semantic_model.encode(job_responsibilities)
+        if similarity_matrix is not None:
+            
+            candidate_responsibilities = [normalize(responsibility)
+                for responsibility in experience.get("responsibilities", [])
+                ]
+            
+            if candidate_responsibilities:
 
-        similarity_matrix=cosine_similarity(
-            candidate_embedding,jd_embedding
-        )
+                start_index = sum(
+                    len(responsibilities)
+                    for responsibilities in all_candidate_responsibilities[:experience_index]
+                    )
 
-        semantic_score=float(similarity_matrix.max())
+                end_index = (start_index+ len(candidate_responsibilities))
 
-        relevance_score=(lexical_score*0.6+semantic_score*0.4)
+                candidate_similarity = similarity_matrix[start_index:end_index]
+
+                semantic_score = float(candidate_similarity.max())
+            else:
+                semantic_score=0.0
+        else:
+            semantic_score=0.0
+
+        relevance_score = (lexical_score * 0.6+ semantic_score * 0.4)
 
         experience_relevance_score.append(relevance_score)
 
+        if relevance_score >= threshold:
+            relevant_years += (experience.get("years", 0) or 0)
 
-        if relevance_score>=threshold:
-            relevant_years+=(experience.get("years",0) or 0)
+            
+
+
     
     if not experience_relevance_score:
         return 0.0
