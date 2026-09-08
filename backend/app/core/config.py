@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY:str
     CHROMA_HOST: str = ""
     CHROMA_PORT: int = 8000
+    EMBEDDING_SERVICE_URL: str
 
     class Config:
         env_file=".env"

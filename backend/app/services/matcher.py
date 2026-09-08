@@ -1,15 +1,11 @@
 import json
-import os
 import httpx
 from sklearn.metrics.pairwise import cosine_similarity
-from dotenv import load_dotenv
+from app.core.config import settings
 
-load_dotenv()
 
-EMBEDDING_SERVICE_URL = os.getenv(
-    "EMBEDDING_SERVICE_URL"
-)
 
+EMBEDDING_SERVICE_URL = settings.EMBEDDING_SERVICE_URL
 
 def get_embeddings(texts: list[str]) -> list[list[float]]:
     response = httpx.post(
@@ -180,9 +176,9 @@ def experience_match(candidate_experience:list[dict],required_years:float|None,j
             normalize(skill) for skill in job_preferred_skills if normalize(skill) in candidate_text
         }
 
-        required_score=(len(matched_required)/len(job_required_skills) if matched_required else 0.0)
+        required_score=(len(matched_required)/len(job_required_skills) if job_required_skills  else 0.0)
 
-        preferred_score=(len(matched_preferred)/len(job_preferred_skills) if matched_preferred else 0.0)
+        preferred_score=(len(matched_preferred)/len(job_preferred_skills) if job_preferred_skills else 0.0)
 
         lexical_score=(required_score*0.7+preferred_score*0.3)
 
@@ -459,13 +455,12 @@ def qualification_match(
 
         if candidate_field and requested_fields:
 
-            requested_embeddings = semantic_model.encode(
-                requested_fields
-            )
+            texts = requested_fields + [candidate_field]
 
-            candidate_embedding = semantic_model.encode(
-                [candidate_field]
-            )
+            embeddings = get_embeddings(texts)
+
+            requested_embeddings = embeddings[:-1]
+            candidate_embedding = embeddings[-1:]
 
             similarity_matrix = cosine_similarity(
                 requested_embeddings,
