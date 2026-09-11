@@ -25,6 +25,24 @@ def get_embeddings(texts: list[str]) -> list[list[float]]:
 def normalize(sample:str)->str:
     return sample.strip().lower()
 
+def parse_job_list(value: str | None) -> list[str]:
+    if not value:
+        return []
+
+    try:
+        parsed = json.loads(value)
+
+        if isinstance(parsed, list):
+            return [str(item).strip() for item in parsed if str(item).strip()]
+    except json.JSONDecodeError:
+        pass
+
+    return [
+        item.strip()
+        for item in value.split(",")
+        if item.strip()
+    ]
+
 
 def skill_match(candidate_skills:list[str],required_skills:list[str])->float:
     if not required_skills:
@@ -508,29 +526,13 @@ def candidate_to_job(candidate,job):
     candidate_skills=json.loads(candidate.skills or "[]")
     candidate_education=json.loads(candidate.education or "[]")
 
-    job_required_skills = [
-        item.strip()
-        for item in (job.required_skills or "").split(",")
-        if item.strip()
-    ]
+    job_required_skills = parse_job_list(job.required_skills)
 
-    job_preferred_skills = [
-        item.strip()
-        for item in (job.preferred_skills or "").split(",")
-        if item.strip()
-    ]
+    job_preferred_skills = parse_job_list(job.preferred_skills)
 
-    job_qualifications = [
-        item.strip()
-        for item in (job.qualifications or "").split(",")
-        if item.strip()
-    ]
+    job_qualifications = parse_job_list(job.qualifications)
 
-    job_responsibilities= [
-        item.strip()
-        for item in (job.responsibilities or "").split(",")
-        if item.strip()
-    ]
+    job_responsibilities = parse_job_list(job.responsibilities)
 
     project_score=project_match(candidate_projects,job_required_skills)
 

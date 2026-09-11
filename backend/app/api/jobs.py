@@ -1,5 +1,6 @@
 from fastapi import APIRouter,Depends,HTTPException
 from sqlmodel import Session,select
+import json
 
 from app.models.candidate import Candidate
 from app.services.matcher import candidate_to_job
@@ -24,10 +25,10 @@ async def extract_job(request:JDRequest,session:Session=Depends(get_session)):
     job=Job(
         title=job_profile.title,
         experience_years=job_profile.experience_years,
-        required_skills=",".join(job_profile.required_skills),
-        preferred_skills=",".join(job_profile.preferred_skills),
-        qualifications=",".join(job_profile.qualifications),
-        responsibilities=",".join(job_profile.responsibilities)
+        required_skills=json.dumps(job_profile.required_skills),
+        preferred_skills=json.dumps(job_profile.preferred_skills),
+        qualifications=json.dumps(job_profile.qualifications),
+        responsibilities=json.dumps(job_profile.responsibilities)
     )
 
     session.add(job)
