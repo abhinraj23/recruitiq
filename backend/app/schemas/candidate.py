@@ -15,6 +15,7 @@ class Project(BaseModel):
 class Education(BaseModel):
     degree: str | None = None
     field: str | None = None
+    degree_level: str | None = None
     institution: str | None = None
     graduation_year: int | None = None
 
