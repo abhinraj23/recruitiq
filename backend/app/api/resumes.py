@@ -53,10 +53,16 @@ def debug_candidates(
         "candidates": [
             {
                 "id": candidate.id,
-                "name": candidate.name
+                "name": candidate.name,
+                "email": candidate.email,
+                "phone": candidate.phone,
+                "skills": candidate.skills,
+                "projects": candidate.projects,
+                "education": candidate.education,
+                "experience": candidate.experience,
             }
             for candidate in candidates
-        ]
+        ],
     }
 
 @router.post("/index-candidates")
