@@ -1,17 +1,25 @@
-import { useState } from "react"
+import { useEffect,useState } from "react"
 
-function Matching() {
+function Matching({ jobId, jobTitle }) {
   const [candidates, setCandidates] = useState([])
+  const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [selectedCandidate, setSelectedCandidate] = useState(null)
+
+  useEffect(() => {
+  if (!jobId) {fetch("/api/jobs/")
+      .then((response) => response.json())
+      .then((data) => setJobs(data))
+  }
+}, [jobId])
 
   const findCandidates = async () => {
     setLoading(true)
     setError("")
 
     try {
-      const response = await fetch("/api/jobs/1/search?top_k=5")
+      const response = await fetch(`/api/jobs/${jobId}/search?top_k=5`)
 
       if (!response.ok) {
         throw new Error("Unable to find candidates")
@@ -26,6 +34,52 @@ function Matching() {
       setLoading(false)
     }
   }
+
+  if (!jobId) {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <p className="eyebrow">CANDIDATE SEARCH</p>
+        <h1>Select a Job</h1>
+        <p className="subtitle">
+          Choose a job to find matching candidates.
+        </p>
+      </div>
+
+      <div className="job-list">
+        {jobs.map((job) => (
+          <div className="job-card" key={job.id}>
+            <div className="job-card-top">
+              <div>
+                <span className="job-status">JOB</span>
+                <h2>{job.title}</h2>
+                <p>
+                  Job ID: #JOB-{String(job.id).padStart(3, "0")}
+                </p>
+              </div>
+
+              <button
+                className="match-button"
+                onClick={() => {
+                  window.dispatchEvent(
+                    new CustomEvent("openMatching", {
+                      detail: {
+                        jobId: job.id,
+                        jobTitle: job.title,
+                      },
+                    })
+                  )
+                }}
+              >
+                Select Job →
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
   if (selectedCandidate) {
   const skills = JSON.parse(selectedCandidate.skills || "[]")
@@ -45,7 +99,7 @@ function Matching() {
       <button className="primary-button"
       onClick={() => { window.dispatchEvent(new CustomEvent("openInterview", {
         detail: {
-          jobId: 1,
+          jobId: jobId,
           candidateId: selectedCandidate.candidate_id,
         },
       })
@@ -59,7 +113,7 @@ function Matching() {
         <p className="eyebrow">MATCH DETAILS</p>
         <h1>{selectedCandidate.name}</h1>
         <p className="subtitle">
-          Detailed candidate match for Python / AI Developer
+          Detailed candidate match for {jobTitle}
         </p>
       </div>
 
@@ -176,11 +230,8 @@ function Matching() {
         <div>
           <span className="job-status">ACTIVE JOB</span>
 
-          <h2>Python / AI Developer</h2>
-
-          <p>
-            Job ID: #JOB-001
-          </p>
+          <h2>{jobTitle}</h2>
+          <p>Job ID: #JOB-{String(jobId).padStart(3, "0")}</p>
         </div>
 
         <button

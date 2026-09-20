@@ -1,16 +1,11 @@
 import { useEffect, useState } from "react"
 
-function Interview() {
-  const [questions, setQuestions] = useState([])
+function Interview({ jobId, candidateId }) {
+  const [interview, setInterview] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-
-    const jobId = params.get("job")
-    const candidateId = params.get("candidate")
-
     fetch(`/api/jobs/${jobId}/candidates/${candidateId}/interview`)
       .then((response) => {
         if (!response.ok) {
@@ -20,7 +15,7 @@ function Interview() {
         return response.json()
       })
       .then((data) => {
-        setQuestions(data.interview)
+        setInterview(data.interview)
       })
       .catch((error) => {
         setError(error.message)
@@ -28,19 +23,26 @@ function Interview() {
       .finally(() => {
         setLoading(false)
       })
-  }, [])
+  }, [jobId, candidateId])
 
   return (
     <div className="page">
+
       <div className="page-header">
         <p className="eyebrow">INTERVIEW</p>
+
         <h1>Interview Questions</h1>
+
         <p className="subtitle">
-          Questions generated based on the job and candidate profile.
+          Questions tailored to the candidate and job requirements.
         </p>
       </div>
 
-      {loading && <p>Generating interview questions...</p>}
+      {loading && (
+        <div className="detail-card">
+          <p>Generating interview questions...</p>
+        </div>
+      )}
 
       {error && (
         <div className="error-message">
@@ -48,11 +50,68 @@ function Interview() {
         </div>
       )}
 
-      {!loading && !error && (
-       <div className="detail-card interview-content">
-            <pre>{questions}</pre>
-       </div>
-)}
+      {!loading && !error && interview && (
+        <>
+          <InterviewSection
+            title="Technical Questions"
+            questions={interview.technical}
+          />
+
+          <InterviewSection
+            title="Experience-Based Questions"
+            questions={interview.experience}
+          />
+
+          <InterviewSection
+            title="Potential Gap"
+            questions={interview.potential_gaps}
+          />
+        </>
+      )}
+
+    </div>
+  )
+}
+
+
+function InterviewSection({ title, questions }) {
+  return (
+    <div className="interview-section">
+
+      <div className="section-header">
+        <h2>{title}</h2>
+        <span>{questions.length} questions</span>
+      </div>
+
+      <div className="interview-question-list">
+
+        {questions.map((item, index) => (
+          <div className="interview-question-card" key={index}>
+
+            <div className="question-number">
+              {index + 1}
+            </div>
+
+            <div className="question-content">
+
+              <h3>{item.title}</h3>
+
+              <p className="question-text">
+                {item.question}
+              </p>
+
+              <div className="assessment">
+                <strong>What to assess</strong>
+                <p>{item.what_to_assess}</p>
+              </div>
+
+            </div>
+
+          </div>
+        ))}
+
+      </div>
+
     </div>
   )
 }

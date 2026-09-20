@@ -1,5 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
 from sqlmodel import Session
+import json
 
 from app.db.database import engine
 from app.models.candidate import Candidate
@@ -12,7 +13,7 @@ interview_prompt = ChatPromptTemplate.from_template(
     """
 You are an expert technical interviewer.
 
-Generate interview questions for the candidate below
+Generate a structured interview plan for the candidate below
 based on the specific job requirements.
 
 Job:
@@ -21,19 +22,56 @@ Job:
 Candidate:
 {candidate}
 
-Generate:
-1. Three technical questions.
-2. Two experience-based questions.
-3. One question about a potential gap or weakness.
+Generate exactly:
 
-For every question, briefly explain why it is relevant.
+- 3 technical questions
+- 2 experience-based questions
+- 1 question about a potential gap or weakness
 
-Do not invent facts about the candidate.
-Use only the information provided.
+For every question provide:
+
+- title: a short descriptive title
+- question: the actual interview question
+- what_to_assess: what the interviewer should evaluate from the candidate's answer
+
+Rules:
+
+1. Use only information provided about the candidate and job.
+2. Do not invent candidate experience, skills, projects, or achievements.
+3. Questions should be specific to this candidate and this job.
+4. Keep questions professional and suitable for a real technical interview.
+5. Do not include introductory text, explanations, Markdown, or headings outside the JSON.
+6. Return ONLY valid JSON.
+
+Use exactly this JSON structure:
+
+{{
+  "technical": [
+    {{
+      "title": "string",
+      "question": "string",
+      "what_to_assess": "string"
+    }}
+  ],
+  "experience": [
+    {{
+      "title": "string",
+      "question": "string",
+      "what_to_assess": "string"
+    }}
+  ],
+  "potential_gaps": [
+    {{
+      "title": "string",
+      "question": "string",
+      "what_to_assess": "string"
+    }}
+  ]
+}}
 """
 )
 
-def build_interview_context(job,candidate_id:int)->str:
+def build_interview_context(job,candidate_id:int):
 
     with Session(engine) as session:
         candidate=session.get(Candidate,candidate_id)
@@ -116,4 +154,12 @@ def generate_interview_questions(job,candidate_id:int)->str:
 
     response=llm.invoke(messages)
 
-    return response.content
+    content = response.content.strip()
+
+    if content.startswith("```json"):
+        content = content[7:]
+
+    if content.endswith("```"):
+        content = content[:-3]
+
+    return json.loads(content.strip())

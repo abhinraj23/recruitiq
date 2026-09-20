@@ -1,42 +1,62 @@
 import { useState } from "react"
+import ReactMarkdown from "react-markdown"
 
 function Enquiry() {
   const [question, setQuestion] = useState("")
   const [answer, setAnswer] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
 
   const askQuestion = async () => {
     if (!question.trim()) return
 
-    const response = await fetch("/api/enquiry/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        question: question,
-      }),
-    })
+    setLoading(true)
+    setError("")
+    setAnswer("")
 
-    const data = await response.json()
+    try {
+      const response = await fetch("/api/enquiry/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question: question,
+        }),
+      })
 
-    setAnswer(
-      data.answer ||
-      data.error ||
-      "No answer was returned."
-    )
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Unable to process your question."
+        )
+      }
+
+      if (data.error) {
+        setError(data.error)
+      } else {
+        setAnswer(data.answer || "No answer was returned.")
+      }
+    } catch (error) {
+      setError(error.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <div className="page">
 
       <div className="page-header">
-        <div>
-          <p className="eyebrow">AI ASSISTANT</p>
-          <h1>Candidate Enquiry</h1>
-          <p className="subtitle">
-            Ask questions about candidates using grounded recruitment data.
-          </p>
-        </div>
+        <p className="eyebrow">RECRUITER ASSISTANT</p>
+
+        <h1>Candidate Enquiry</h1>
+
+        <p className="subtitle">
+          Ask questions about your candidates and get answers from
+          recruitment data.
+        </p>
       </div>
 
       <div className="enquiry-container">
@@ -44,34 +64,54 @@ function Enquiry() {
         <div className="enquiry-input">
 
           <textarea
-            placeholder="Example: Which candidates have experience with data pipelines?"
+            placeholder="Ask something about your candidates..."
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && event.ctrlKey) {
+                askQuestion()
+              }
+            }}
           />
 
-          <button
-            className="primary-button"
-            onClick={askQuestion}
-          >
-            Ask RecruitIQ →
-          </button>
+          <div className="enquiry-actions">
+            <span>Ctrl + Enter to ask</span>
+
+            <button
+              className="primary-button"
+              onClick={askQuestion}
+              disabled={loading || !question.trim()}
+            >
+              {loading ? "Searching..." : "Ask RecruitIQ →"}
+            </button>
+          </div>
 
         </div>
+
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
 
         {answer && (
           <div className="answer-card">
 
             <div className="answer-header">
-              <span>AI RESPONSE</span>
+              <div>
+                <span>RECRUITER ASSISTANT</span>
+                <h2>Answer</h2>
+              </div>
             </div>
 
-            <p>{answer}</p>
+            <div className="answer-content">
+              <ReactMarkdown>{answer}</ReactMarkdown>
+            </div>
 
           </div>
         )}
 
       </div>
-
     </div>
   )
 }

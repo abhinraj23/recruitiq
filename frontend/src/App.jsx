@@ -10,19 +10,34 @@ import Interview from "./pages/interview"
 
 function App() {
   const [activePage, setActivePage] = useState("Dashboard")
+  const [interviewData, setInterviewData] = useState(null)
+  const [selectedJob, setSelectedJob] = useState(null)
 
   useEffect(() => {
-  const openInterview = () => {
+  const openInterview = (event) => {
+    setInterviewData(event.detail)
     setActivePage("Interview")
   }
 
+  const openMatching = (event) => {
+    setSelectedJob(event.detail)
+    setActivePage("Matching")
+  }
+
+  const openEnquiry = () => {
+    setActivePage("Enquiry")
+  }
+
   window.addEventListener("openInterview", openInterview)
+  window.addEventListener("openMatching", openMatching)
+  window.addEventListener("openEnquiry", openEnquiry)
 
   return () => {
     window.removeEventListener("openInterview", openInterview)
+    window.removeEventListener("openMatching", openMatching)
+    window.removeEventListener("openEnquiry", openEnquiry)
   }
 }, [])
-
   const renderPage = () => {
     switch (activePage) {
       case "Dashboard":
@@ -35,13 +50,13 @@ function App() {
         return <Jobs />
 
       case "Matching":
-        return <Matching />
+        return(<Matching jobId={selectedJob?.jobId} jobTitle={selectedJob?.jobTitle}/>)
 
       case "Enquiry":
         return <Enquiry />
 
       case "Interview":
-        return <Interview />
+        return ( <Interview jobId={interviewData?.jobId} candidateId={interviewData?.candidateId}/> )
 
       default:
         return <Dashboard />

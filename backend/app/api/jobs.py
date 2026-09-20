@@ -18,6 +18,12 @@ router=APIRouter(
 
 )
 
+@router.get("/")
+def get_jobs(session: Session = Depends(get_session)):
+    jobs = session.exec(select(Job)).all()
+    return jobs
+
+
 @router.post("/extract")
 async def extract_job(request:JDRequest,session:Session=Depends(get_session)):
     job_profile=extract_job_profile(request.description)
